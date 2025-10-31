@@ -32,14 +32,16 @@ function setup() {
     setTimeout(() => resizeCanvas(windowWidth, windowHeight), 100);
   });
 
-  // --- Login UI (nyt) ---
+  // --- Login UI (nyt/forbedret) ---
   createLoginUI();
   positionLoginUI();
+  updateLoginVisibility(); // skjul i portrait
 }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   positionLoginUI();
+  updateLoginVisibility();
 }
 
 /* Undgå scroll på touch-drag */
@@ -47,32 +49,27 @@ function touchMoved() { return false; }
 
 /* ========== LOGIN Helpers ========== */
 function createLoginUI(){
+  // Klasse
   classInput = createInput('');
   classInput.attribute('placeholder','Klasse (fx 8A)');
-  classInput.style('font-family','"League Spartan",system-ui');
-  classInput.style('font-weight','700');
-  classInput.style('font-size','22px');
-  classInput.style('padding','12px 14px');
-  classInput.style('border','0');
-  classInput.style('border-radius','12px');
-  classInput.style('outline','none');
-  classInput.style('width','min(80vw, 420px)');
-  classInput.style('box-shadow','0 8px 18px rgba(0,0,0,.15)');
-  classInput.style('background','#fff');
+  // mobil-venlige hints
+  classInput.attribute('inputmode','text');
+  classInput.attribute('enterkeyhint','go');
+  classInput.attribute('autocapitalize','characters');
+  classInput.attribute('autocomplete','off');
+  // styling
+  baseInputStyle(classInput);
 
+  // Kodeord
   passInput = createInput('', 'password');
   passInput.attribute('placeholder','Kodeord');
-  passInput.style('font-family','"League Spartan",system-ui');
-  passInput.style('font-weight','700');
-  passInput.style('font-size','22px');
-  passInput.style('padding','12px 14px');
-  passInput.style('border','0');
-  passInput.style('border-radius','12px');
-  passInput.style('outline','none');
-  passInput.style('width','min(80vw, 420px)');
-  passInput.style('box-shadow','0 8px 18px rgba(0,0,0,.15)');
-  passInput.style('background','#fff');
+  passInput.attribute('inputmode','text');
+  passInput.attribute('enterkeyhint','go');
+  passInput.attribute('autocomplete','off');
+  passInput.attribute('autocapitalize','off');
+  baseInputStyle(passInput);
 
+  // Log ind-knap
   loginBtn = createButton('Log ind');
   loginBtn.style('font-family','"League Spartan",system-ui');
   loginBtn.style('font-weight','700');
@@ -83,35 +80,92 @@ function createLoginUI(){
   loginBtn.style('background','#000');
   loginBtn.style('color','#fff');
   loginBtn.style('box-shadow','0 8px 18px rgba(0,0,0,.25)');
+  loginBtn.style('position','fixed');
+  loginBtn.style('z-index','10001'); // over canvas
   loginBtn.mousePressed(handleLogin);
+
+  // ENTER/Return skal logge ind
+  classInput.elt.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter') { e.preventDefault(); handleLogin(); }
+  });
+  passInput.elt.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter') { e.preventDefault(); handleLogin(); }
+  });
+
+  // Fokus første felt ved første tap
+  setTimeout(()=>{ try{ classInput.elt.focus(); }catch(_){} }, 200);
+}
+
+function baseInputStyle(inp){
+  inp.style('font-family','"League Spartan",system-ui');
+  inp.style('font-weight','700');
+  inp.style('font-size','22px');
+  inp.style('padding','12px 14px');
+  inp.style('border','0');
+  inp.style('border-radius','12px');
+  inp.style('outline','none');
+  inp.style('width','min(80vw, 420px)');
+  inp.style('box-shadow','0 8px 18px rgba(0,0,0,.15)');
+  inp.style('background','#fff');
+  inp.style('position','fixed');   // altid over canvas
+  inp.style('z-index','10001');
+  inp.style('-webkit-user-select','auto');
+  inp.style('user-select','auto');
 }
 
 function positionLoginUI(){
   if (!classInput || !passInput || !loginBtn) return;
-  // midt på skærmen i en lodret kolonne
-  const centerX = width / 2;
-  const baseY = height / 2;
+  const centerX = windowWidth / 2;
+  const baseY = windowHeight / 2;
   const gap = 16;
 
-  // mål knapper via dom (groft)
-  const inputW = min(windowWidth*0.8, 420);
+  const inputW = Math.min(windowWidth*0.8, 420);
   const inputH = 52;
 
   classInput.position(centerX - inputW/2, baseY - inputH - gap*2);
   passInput.position(centerX - inputW/2, baseY);
-  loginBtn.position(centerX - 120, baseY + inputH + gap*1.5);
+  loginBtn.position(centerX - 80, baseY + inputH + gap*1.5);
 }
 
-function handleLogin(){
+// Vis/skjul loginfelter i portrait/landscape
+function updateLoginVisibility(){
+  const isPortrait = windowHeight > windowWidth;
+  if (!loggedIn) {
+    if (isPortrait) { classInput.hide(); passInput.hide(); loginBtn.hide(); }
+    else { classInput.show(); passInput.show(); loginBtn.show(); }
+  }
+}
+
+async function handleLogin(){
+  // Kræv landscape for login
+  if (windowHeight > windowWidth) {
+    // forsøg fullscreen + orienteringslås
+    try {
+      if (!fullscreen()) { fullscreen(true); }
+      if (screen.orientation && screen.orientation.lock) {
+        await screen.orientation.lock('landscape').catch(()=>{});
+      }
+    } catch(_) {}
+    // efter et øjeblik prøv igen at vise felter hvis roteret
+    setTimeout(() => { updateLoginVisibility(); positionLoginUI(); }, 300);
+    return; // først rotere, så prøver de igen
+  }
+
   const c = (classInput?.value() || '').trim();
   const p = (passInput?.value() || '').trim();
   // Prototype: alt godkendes hvis begge felter er udfyldt
   if (c && p) {
+    // forsøg fuldskærm + orienteringslås ved login
+    try {
+      if (!fullscreen()) { fullscreen(true); }
+      if (screen.orientation && screen.orientation.lock) {
+        await screen.orientation.lock('landscape').catch(()=>{});
+      }
+    } catch(_) {}
+
     loggedIn = true;
-    // Skjul login elementer
     classInput.hide(); passInput.hide(); loginBtn.hide();
   } else {
-    // enkel feedback ved tomme felter
     loginBtn.html('Udfyld begge felter');
     setTimeout(() => loginBtn.html('Log ind'), 1200);
   }
@@ -279,10 +333,13 @@ function draw() {
 
   // --- LOGIN SCREEN (gate) ---
   if (!loggedIn) {
-    // enkel branding/login
+    if (height > width) {
+      // kræv landscape før login
+      drawCleanText("Drej telefonen til landscape for at logge ind", width/2, height*0.5, min(width,height)*0.05, 0);
+      return;
+    }
     drawCleanText("CalmAir", width/2, height*0.28, min(width,height)*0.10, 0);
     drawCleanText("Log ind for at fortsætte", width/2, height*0.35, min(width,height)*0.045, 0);
-    // inputs håndteres af DOM; resten af appen venter til login
     return;
   }
 
@@ -377,7 +434,13 @@ function mousePressed() {
 
   // Hvis ikke logget ind, prøv at fokusere første input
   if (!loggedIn) {
-    classInput?.elt?.focus?.();
+    if (height > width) {
+      // forsøg at hjælpe bruger med at rotere: prøv fullscreen
+      try { if (!fullscreen()) fullscreen(true); } catch(_) {}
+      updateLoginVisibility();
+    } else {
+      classInput?.elt?.focus?.();
+    }
     return;
   }
 
