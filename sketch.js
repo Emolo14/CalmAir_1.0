@@ -3,7 +3,6 @@ let mic, aktiv = false, mute = false;
 let volRaw = 0, volFilt = 0, dB = 30;
 let co2 = 600, co2Start = 0;
 let alarmTone = null;
-let fsBtn; // fuldskærms-knap (DOM)
 
 /* --- LOGIN (prototype) --- */
 let loggedIn = false;
@@ -23,16 +22,7 @@ function setup() {
   mic = new p5.AudioIn();
   co2Start = millis();
 
-  // --- Fuld skærm knap (som før) ---
-  fsBtn = createButton("Fuld skærm");
-  fsBtn.addClass("fs-btn");
-  fsBtn.mousePressed(() => {
-    const fs = fullscreen();
-    fullscreen(!fs);
-    setTimeout(() => resizeCanvas(windowWidth, windowHeight), 100);
-  });
-
-  // --- Login UI (nyt/forbedret) ---
+  // --- Login UI ---
   createLoginUI();
   positionLoginUI();
   updateLoginVisibility(); // skjul i portrait
@@ -52,12 +42,10 @@ function createLoginUI(){
   // Klasse
   classInput = createInput('');
   classInput.attribute('placeholder','Klasse (fx 8A)');
-  // mobil-venlige hints
   classInput.attribute('inputmode','text');
   classInput.attribute('enterkeyhint','go');
   classInput.attribute('autocapitalize','characters');
   classInput.attribute('autocomplete','off');
-  // styling
   baseInputStyle(classInput);
 
   // Kodeord
@@ -81,10 +69,10 @@ function createLoginUI(){
   loginBtn.style('color','#fff');
   loginBtn.style('box-shadow','0 8px 18px rgba(0,0,0,.25)');
   loginBtn.style('position','fixed');
-  loginBtn.style('z-index','10001'); // over canvas
+  loginBtn.style('z-index','10001');
   loginBtn.mousePressed(handleLogin);
 
-  // ENTER/Return skal logge ind
+  // ENTER/Return logger ind
   classInput.elt.addEventListener('keydown', (e)=>{
     if (e.key === 'Enter') { e.preventDefault(); handleLogin(); }
   });
@@ -92,7 +80,7 @@ function createLoginUI(){
     if (e.key === 'Enter') { e.preventDefault(); handleLogin(); }
   });
 
-  // Fokus første felt ved første tap
+  // Valgfri: sæt initialt fokus på klassefelt – men vi tvinger IKKE fokus ved tap
   setTimeout(()=>{ try{ classInput.elt.focus(); }catch(_){} }, 200);
 }
 
@@ -139,23 +127,23 @@ function updateLoginVisibility(){
 async function handleLogin(){
   // Kræv landscape for login
   if (windowHeight > windowWidth) {
-    // forsøg fullscreen + orienteringslås
+    // prøv fullscreen + orienteringslås
     try {
       if (!fullscreen()) { fullscreen(true); }
       if (screen.orientation && screen.orientation.lock) {
         await screen.orientation.lock('landscape').catch(()=>{});
       }
     } catch(_) {}
-    // efter et øjeblik prøv igen at vise felter hvis roteret
+    // vis felter igen hvis roteret
     setTimeout(() => { updateLoginVisibility(); positionLoginUI(); }, 300);
-    return; // først rotere, så prøver de igen
+    return;
   }
 
   const c = (classInput?.value() || '').trim();
   const p = (passInput?.value() || '').trim();
-  // Prototype: alt godkendes hvis begge felter er udfyldt
+
+  // Prototype: godkend hvis begge felter er udfyldt
   if (c && p) {
-    // forsøg fuldskærm + orienteringslås ved login
     try {
       if (!fullscreen()) { fullscreen(true); }
       if (screen.orientation && screen.orientation.lock) {
@@ -172,7 +160,6 @@ async function handleLogin(){
 }
 
 /* ========== Helpers (eksisterende) ========== */
-// Ren tekst uden outlines/shadows
 function drawCleanText(txt, x, y, size, col = 255) {
   push();
   textFont("League Spartan"); textStyle(BOLD); textAlign(CENTER, CENTER);
@@ -181,30 +168,25 @@ function drawCleanText(txt, x, y, size, col = 255) {
   pop();
 }
 
-// p5.Color -> CSS rgba()
 function cssCol(c, aOverride = null){
   const r = red(c), g = green(c), b = blue(c);
   const a = (aOverride===null ? alpha(c)/255 : aOverride);
   return `rgba(${r},${g},${b},${a})`;
 }
 
-// Premium emoji med glans – stabil (altid synlig)
 function drawPremiumEmoji(fx, fy, D, co2){
   drawingContext.shadowBlur = 0;
   drawingContext.globalAlpha = 1;
 
-  // Grundfarve efter CO₂
   let baseC;
   if (co2 < CO2_YELLOW) baseC = color(52,199,89);
   else if (co2 < CO2_RED) baseC = color(255,214,10);
   else baseC = color(255,69,58);
 
-  // --- Farvet baggrund først ---
   noStroke();
   fill(baseC);
   circle(fx, fy, D);
 
-  // --- Glanslag ovenpå ---
   const grad = drawingContext.createRadialGradient(
     fx - D*0.25, fy - D*0.25, D*0.05,
     fx, fy, D*0.70
@@ -219,13 +201,11 @@ function drawPremiumEmoji(fx, fy, D, co2){
   strokeWeight(D * 0.05);
   circle(fx, fy, D);
 
-  // Øjne
   noStroke(); fill(0);
   const eyeR = D * 0.10, ex = D * 0.24, ey = D * 0.16;
   circle(fx - ex, fy - ey, eyeR);
   circle(fx + ex, fy - ey, eyeR);
 
-  // Mund
   stroke(0); strokeWeight(D * 0.06); noFill();
   if (co2 < CO2_YELLOW) {
     arc(fx, fy + D * 0.05, D * 0.50, D * 0.28, 20, 160);
@@ -236,7 +216,6 @@ function drawPremiumEmoji(fx, fy, D, co2){
   }
 }
 
-// Farve-segment i speedometer
 function drawBand(cx, cy, R, fromDB, toDB, col) {
   let a1 = map(fromDB, DB_MIN, DB_MAX, 180, 360);
   let a2 = map(toDB,   DB_MIN, DB_MAX, 180, 360);
@@ -244,7 +223,6 @@ function drawBand(cx, cy, R, fromDB, toDB, col) {
   arc(cx, cy, R*2, R*2, a1, a2);
 }
 
-// Farve til dB-tekst efter niveau
 function getDbColor(db) {
   if (db < 55) return color(0,140,0);
   if (db < 70) return color(0,180,0);
@@ -253,7 +231,6 @@ function getDbColor(db) {
   return color(255,0,0);
 }
 
-// 3D speedometer
 function drawGauge3D(cx, cy, R, dBvalue) {
   push();
   noFill(); stroke(30,30,30); strokeWeight(R*0.20);
@@ -334,12 +311,12 @@ function draw() {
   // --- LOGIN SCREEN (gate) ---
   if (!loggedIn) {
     if (height > width) {
-      // kræv landscape før login
-      drawCleanText("Drej telefonen til landscape for at logge ind", width/2, height*0.5, min(width,height)*0.05, 0);
+      drawCleanText("Drej til landscape for at logge ind", width/2, height*0.50, min(width,height)*0.05, 0);
       return;
     }
-    drawCleanText("CalmAir", width/2, height*0.28, min(width,height)*0.10, 0);
-    drawCleanText("Log ind for at fortsætte", width/2, height*0.35, min(width,height)*0.045, 0);
+    // titel rykket lidt op
+    drawCleanText("CalmAir", width/2, height*0.20, min(width,height)*0.10, 0);
+    drawCleanText("Log ind for at fortsætte", width/2, height*0.30, min(width,height)*0.045, 0);
     return;
   }
 
@@ -432,15 +409,9 @@ function mousePressed() {
   // nødvendig for lyd på mobil
   getAudioContext().resume();
 
-  // Hvis ikke logget ind, prøv at fokusere første input
+  // Hvis ikke logget ind: vi tvinger IKKE fokus til "Klasse"
   if (!loggedIn) {
-    if (height > width) {
-      // forsøg at hjælpe bruger med at rotere: prøv fullscreen
-      try { if (!fullscreen()) fullscreen(true); } catch(_) {}
-      updateLoginVisibility();
-    } else {
-      classInput?.elt?.focus?.();
-    }
+    // bruger kan selv trykke i de felter de vil
     return;
   }
 
