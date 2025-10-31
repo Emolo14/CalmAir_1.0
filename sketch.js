@@ -3,13 +3,11 @@ let mic, aktiv = false, mute = false;
 let volRaw = 0, volFilt = 0, dB = 30;
 let co2 = 600, co2Start = 0;
 let alarmTone = null;
+let fsBtn; // fuldskærms-knap (DOM)
 
-
-// --- CO₂ alarm (5 sek) ---
-let co2AlarmUntil = 0;     // stop-tidspunkt i millis()
-let co2AlarmTone = null;   // CO₂ alarm tone
-let lastCo2WasRed = false; // fanger overgang til rød
-let lastCo2MuteBtn = null; // klikzone for højre "Sluk for lyd"
+/* --- LOGIN (prototype) --- */
+let loggedIn = false;
+let classInput, passInput, loginBtn;
 
 /* Grænser */
 const DB_MIN = 30, DB_MAX = 100, DB_RED = 90;   // alarm ved 90 dB
@@ -25,17 +23,102 @@ function setup() {
   mic = new p5.AudioIn();
   co2Start = millis();
 
+  // --- Fuld skærm knap (som før) ---
+  fsBtn = createButton("Fuld skærm");
+  fsBtn.addClass("fs-btn");
+  fsBtn.mousePressed(() => {
+    const fs = fullscreen();
+    fullscreen(!fs);
+    setTimeout(() => resizeCanvas(windowWidth, windowHeight), 100);
+  });
 
+  // --- Login UI (nyt) ---
+  createLoginUI();
+  positionLoginUI();
 }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
+  positionLoginUI();
 }
 
 /* Undgå scroll på touch-drag */
 function touchMoved() { return false; }
 
-/* ========== Helpers ========== */
+/* ========== LOGIN Helpers ========== */
+function createLoginUI(){
+  classInput = createInput('');
+  classInput.attribute('placeholder','Klasse (fx 8A)');
+  classInput.style('font-family','"League Spartan",system-ui');
+  classInput.style('font-weight','700');
+  classInput.style('font-size','22px');
+  classInput.style('padding','12px 14px');
+  classInput.style('border','0');
+  classInput.style('border-radius','12px');
+  classInput.style('outline','none');
+  classInput.style('width','min(80vw, 420px)');
+  classInput.style('box-shadow','0 8px 18px rgba(0,0,0,.15)');
+  classInput.style('background','#fff');
+
+  passInput = createInput('', 'password');
+  passInput.attribute('placeholder','Kodeord');
+  passInput.style('font-family','"League Spartan",system-ui');
+  passInput.style('font-weight','700');
+  passInput.style('font-size','22px');
+  passInput.style('padding','12px 14px');
+  passInput.style('border','0');
+  passInput.style('border-radius','12px');
+  passInput.style('outline','none');
+  passInput.style('width','min(80vw, 420px)');
+  passInput.style('box-shadow','0 8px 18px rgba(0,0,0,.15)');
+  passInput.style('background','#fff');
+
+  loginBtn = createButton('Log ind');
+  loginBtn.style('font-family','"League Spartan",system-ui');
+  loginBtn.style('font-weight','700');
+  loginBtn.style('font-size','22px');
+  loginBtn.style('padding','12px 18px');
+  loginBtn.style('border','0');
+  loginBtn.style('border-radius','12px');
+  loginBtn.style('background','#000');
+  loginBtn.style('color','#fff');
+  loginBtn.style('box-shadow','0 8px 18px rgba(0,0,0,.25)');
+  loginBtn.mousePressed(handleLogin);
+}
+
+function positionLoginUI(){
+  if (!classInput || !passInput || !loginBtn) return;
+  // midt på skærmen i en lodret kolonne
+  const centerX = width / 2;
+  const baseY = height / 2;
+  const gap = 16;
+
+  // mål knapper via dom (groft)
+  const inputW = min(windowWidth*0.8, 420);
+  const inputH = 52;
+
+  classInput.position(centerX - inputW/2, baseY - inputH - gap*2);
+  passInput.position(centerX - inputW/2, baseY);
+  loginBtn.position(centerX - 120, baseY + inputH + gap*1.5);
+}
+
+function handleLogin(){
+  const c = (classInput?.value() || '').trim();
+  const p = (passInput?.value() || '').trim();
+  // Prototype: alt godkendes hvis begge felter er udfyldt
+  if (c && p) {
+    loggedIn = true;
+    // Skjul login elementer
+    classInput.hide(); passInput.hide(); loginBtn.hide();
+  } else {
+    // enkel feedback ved tomme felter
+    loginBtn.html('Udfyld begge felter');
+    setTimeout(() => loginBtn.html('Log ind'), 1200);
+  }
+}
+
+/* ========== Helpers (eksisterende) ========== */
+// Ren tekst uden outlines/shadows
 function drawCleanText(txt, x, y, size, col = 255) {
   push();
   textFont("League Spartan"); textStyle(BOLD); textAlign(CENTER, CENTER);
@@ -44,26 +127,30 @@ function drawCleanText(txt, x, y, size, col = 255) {
   pop();
 }
 
+// p5.Color -> CSS rgba()
 function cssCol(c, aOverride = null){
   const r = red(c), g = green(c), b = blue(c);
   const a = (aOverride===null ? alpha(c)/255 : aOverride);
   return `rgba(${r},${g},${b},${a})`;
 }
 
-// Emoji med glans
+// Premium emoji med glans – stabil (altid synlig)
 function drawPremiumEmoji(fx, fy, D, co2){
   drawingContext.shadowBlur = 0;
   drawingContext.globalAlpha = 1;
 
+  // Grundfarve efter CO₂
   let baseC;
   if (co2 < CO2_YELLOW) baseC = color(52,199,89);
   else if (co2 < CO2_RED) baseC = color(255,214,10);
   else baseC = color(255,69,58);
 
+  // --- Farvet baggrund først ---
   noStroke();
   fill(baseC);
   circle(fx, fy, D);
 
+  // --- Glanslag ovenpå ---
   const grad = drawingContext.createRadialGradient(
     fx - D*0.25, fy - D*0.25, D*0.05,
     fx, fy, D*0.70
@@ -78,11 +165,13 @@ function drawPremiumEmoji(fx, fy, D, co2){
   strokeWeight(D * 0.05);
   circle(fx, fy, D);
 
+  // Øjne
   noStroke(); fill(0);
   const eyeR = D * 0.10, ex = D * 0.24, ey = D * 0.16;
   circle(fx - ex, fy - ey, eyeR);
   circle(fx + ex, fy - ey, eyeR);
 
+  // Mund
   stroke(0); strokeWeight(D * 0.06); noFill();
   if (co2 < CO2_YELLOW) {
     arc(fx, fy + D * 0.05, D * 0.50, D * 0.28, 20, 160);
@@ -93,6 +182,7 @@ function drawPremiumEmoji(fx, fy, D, co2){
   }
 }
 
+// Farve-segment i speedometer
 function drawBand(cx, cy, R, fromDB, toDB, col) {
   let a1 = map(fromDB, DB_MIN, DB_MAX, 180, 360);
   let a2 = map(toDB,   DB_MIN, DB_MAX, 180, 360);
@@ -100,6 +190,7 @@ function drawBand(cx, cy, R, fromDB, toDB, col) {
   arc(cx, cy, R*2, R*2, a1, a2);
 }
 
+// Farve til dB-tekst efter niveau
 function getDbColor(db) {
   if (db < 55) return color(0,140,0);
   if (db < 70) return color(0,180,0);
@@ -108,6 +199,7 @@ function getDbColor(db) {
   return color(255,0,0);
 }
 
+// 3D speedometer
 function drawGauge3D(cx, cy, R, dBvalue) {
   push();
   noFill(); stroke(30,30,30); strokeWeight(R*0.20);
@@ -155,7 +247,7 @@ function drawGauge3D(cx, cy, R, dBvalue) {
   pop();
 }
 
-/* Alarm-bjælke + mindre mute-knap */
+/* ========== Alarm-bjælke + mindre mute-knap ========== */
 let lastMuteBtn = null;
 function drawAlarmStripeAndMuteButton(topH){
   const wLeft   = width/2;
@@ -165,8 +257,10 @@ function drawAlarmStripeAndMuteButton(topH){
   noStroke();
   fill(blink ? color(255,0,0) : color(255,230,0));
   rect(0, 0, wLeft, stripeH);
+
   drawCleanText("HØJT LYDNIVEAU!", wLeft/2, stripeH/2 + 1, stripeH*0.55, 0);
 
+  // mindre knap
   const pad = 16;
   const btnW = wLeft * 0.30;
   const btnH = (topH) * 0.08;
@@ -179,43 +273,31 @@ function drawAlarmStripeAndMuteButton(topH){
   lastMuteBtn = {x: bx, y: by, w: btnW, h: btnH};
 }
 
-/* CO₂-alarm-bjælke */
-function drawCo2AlarmStripeAndMuteButton(topH){
-  const x0 = width / 2;
-  const stripeH = min(width, height) * 0.08;
-  const blink = (floor(millis()/250) % 2 === 0);
-
-  noStroke();
-  fill(blink ? color(255,0,0) : color(255,230,0));
-  rect(x0, 0, width/2, stripeH);
-  drawCleanText("HØJ CO₂!", x0 + width/4, stripeH/2 + 1, stripeH*0.55, 0);
-
-  const pad = 16;
-  const btnW = (width/2) * 0.30;
-  const btnH = topH * 0.08;
-  const bx = x0 + pad;
-  const by = topH - btnH - pad;
-
-  fill("#222");
-  rect(bx, by, btnW, btnH, 12);
-  drawCleanText("Sluk for lyd", bx + btnW/2, by + btnH/2 - 1, btnH*0.48, 255);
-  lastCo2MuteBtn = { x: bx, y: by, w: btnW, h: btnH };
-}
-
-/* ========== DRAW ========== */
+/* ========== Draw ========== */
 function draw() {
   background("#F6D466");
+
+  // --- LOGIN SCREEN (gate) ---
+  if (!loggedIn) {
+    // enkel branding/login
+    drawCleanText("CalmAir", width/2, height*0.28, min(width,height)*0.10, 0);
+    drawCleanText("Log ind for at fortsætte", width/2, height*0.35, min(width,height)*0.045, 0);
+    // inputs håndteres af DOM; resten af appen venter til login
+    return;
+  }
 
   if (height > width) {
     drawCleanText("Vend telefonen til landscape", width/2, height/2, min(width,height)*0.06, 0);
     return;
   }
 
+  // Lyd
   if (aktiv) volRaw = mic.getLevel();
   volFilt = lerp(volFilt, volRaw, 0.10);
   let dB_target = map(constrain(volFilt, 0, 0.15), 0, 0.15, DB_MIN, DB_MAX);
   dB = constrain(lerp(dB, dB_target, 0.20), DB_MIN, DB_MAX);
 
+  // CO₂ cyklus: 600→1200 (3 min) → 800 (2 min)
   const T_UP = 180, T_DOWN = 120, T_TOTAL = T_UP + T_DOWN;
   let t = (millis() - co2Start) / 1000;
   let phase = t % T_TOTAL;
@@ -225,16 +307,10 @@ function draw() {
   co2 += (noise(t * 0.05) - 0.5) * 4;
   co2 = constrain(co2, 400, 1400);
 
-  // CO₂ alarm-timer
-  const nowCo2Red = co2 >= CO2_RED;
-  if (nowCo2Red && !lastCo2WasRed) {
-    co2AlarmUntil = millis() + 5000;
-  }
-  lastCo2WasRed = nowCo2Red;
-
   const topH = height * 0.7;
   const bundH = height - topH;
 
+  // Centerlinjer
   let midX = width / 2;
   stroke(0); strokeCap(ROUND); strokeWeight(20);
   line(midX, height/2, midX, 0);
@@ -242,19 +318,23 @@ function draw() {
   strokeWeight(12); line(0, topH, width, topH);
   noStroke();
 
+  // VENSTRE TOP: 3D speedometer
   let cx = width * 0.25, cy = topH * 0.60;
   let R  = min(width/2, topH) * 0.48;
   drawGauge3D(cx, cy, R, dB);
 
+  // dB-tekster (puls + farve, rykket ned)
   let pulse = 1 + sin(millis() / 220) * 0.05;
   let dbColor = getDbColor(dB);
   drawCleanText("dB",            cx, cy + R*0.24, R*0.20 * pulse, dbColor);
   drawCleanText(int(dB) + " dB", cx, cy + R*0.52, R*0.28 * pulse, dbColor);
 
+  // HØJRE TOP: Emoji med stabil glans
   let fx = width * 0.75, fy = topH * 0.49;
   let D  = min(width/2, topH) * 0.86;
   drawPremiumEmoji(fx, fy, D, co2);
 
+  // NEDERST: afrundede bokse
   const pad = 8;
   push();
   drawingContext.shadowBlur = 18; drawingContext.shadowColor = 'rgba(0,0,0,0.35)';
@@ -275,7 +355,7 @@ function draw() {
   drawCleanText(aktiv ? "Stop" : "Start", width*0.25, topH + bundH/2, bundH*0.6, 255);
   drawCleanText(int(co2) + " ppm",        width*0.75, topH + bundH/2, bundH*0.6, 255);
 
-  // -------- Lydalarm (dB) --------
+  // Alarm: visuel bliver >90; lyd kan mutes
   const alarmOn = aktiv && dB > DB_RED;
   if (alarmOn) {
     if (!mute && !alarmTone) { alarmTone = new p5.Oscillator('sawtooth'); alarmTone.start(); }
@@ -288,23 +368,6 @@ function draw() {
   } else if (alarmTone) {
     alarmTone.amp(0, 0.1); alarmTone.stop(); alarmTone = null; lastMuteBtn = null;
   }
-
-  // -------- CO₂ ALARM (5 sek) --------
-  const co2AlarmOn = millis() < co2AlarmUntil;
-  if (co2AlarmOn) {
-    if (!mute && !co2AlarmTone) { co2AlarmTone = new p5.Oscillator('triangle'); co2AlarmTone.start(); }
-    if (!mute && co2AlarmTone) {
-      const f = (floor(millis()/250) % 2 === 0) ? 980 : 740;
-      co2AlarmTone.freq(f);
-      co2AlarmTone.amp(0.35, 0.05);
-    }
-    if (mute && co2AlarmTone) {
-      co2AlarmTone.amp(0, 0.15); co2AlarmTone.stop(); co2AlarmTone = null;
-    }
-    drawCo2AlarmStripeAndMuteButton(topH);
-  } else if (co2AlarmTone) {
-    co2AlarmTone.amp(0, 0.1); co2AlarmTone.stop(); co2AlarmTone = null; lastCo2MuteBtn = null;
-  }
 }
 
 /* ========== Input ========== */
@@ -312,44 +375,32 @@ function mousePressed() {
   // nødvendig for lyd på mobil
   getAudioContext().resume();
 
-  // CO₂: "Sluk for lyd" (kun aktiv mens CO₂-alarm kører)
-  if (lastCo2MuteBtn) {
-    const {x,y,w,h} = lastCo2MuteBtn;
-    if (mouseX >= x && mouseX <= x+w && mouseY >= y && mouseY <= y+h) {
-      mute = !mute;
-      if (mute && co2AlarmTone) { co2AlarmTone.amp(0, 0.1); co2AlarmTone.stop(); co2AlarmTone = null; }
-      return; // stop her, så vi ikke også rammer Start/Stop
-    }
+  // Hvis ikke logget ind, prøv at fokusere første input
+  if (!loggedIn) {
+    classInput?.elt?.focus?.();
+    return;
   }
 
-  // dB: "Sluk for lyd" (kun aktiv mens dB-alarm kører)
+  // “Sluk for lyd”-knap (kun når alarm vises)
   if (lastMuteBtn) {
     const {x,y,w,h} = lastMuteBtn;
     if (mouseX >= x && mouseX <= x+w && mouseY >= y && mouseY <= y+h) {
       mute = !mute;
       if (mute && alarmTone) { alarmTone.amp(0, 0.1); alarmTone.stop(); alarmTone = null; }
-      return; // stop her
+      return;
     }
   }
 
-  // Start/Stop (VENSTRE nederste boks)
+  // Start/Stop (venstre boks nederst)
   const topH = height * 0.7;
   if (mouseX >= 0 && mouseX <= width/2 && mouseY >= topH && mouseY <= height) {
     if (aktiv) {
-      mic.stop();
-      aktiv = false;
-      mute = false;
-      // sluk evt. alarmer
-      if (alarmTone)     { alarmTone.amp(0, 0.1); alarmTone.stop(); alarmTone = null; }
-      if (co2AlarmTone)  { co2AlarmTone.amp(0, 0.1); co2AlarmTone.stop(); co2AlarmTone = null; }
+      mic.stop(); aktiv = false; mute = false;
+      if (alarmTone) { alarmTone.amp(0, 0.1); alarmTone.stop(); alarmTone = null; }
     } else {
-      mic.start();
-      aktiv = true;
+      mic.start(); aktiv = true;
     }
-    return;
   }
-
-  // (klik andre steder gør ingenting)
 }
 
 function touchStarted(){ mousePressed(); return false; }
