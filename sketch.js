@@ -113,17 +113,17 @@ function positionLoginUI(){
   // Venstre kolonne layout
   const leftW   = windowWidth/2;
   const padL    = Math.min(32, leftW*0.06); // venstre margin
-  const maxW    = Math.min(leftW - padL*2, 420);
+  const maxW    = Math.min(leftW - padL*2, 380);
   const startY  = windowHeight*0.22;        // top til overskriftens bund
-  const gap     = 18;
-  const inputH  = 52;
+  const gap     = 14;
+  const inputH  = 46;
 
   classInput.style('width', `${maxW}px`);
   passInput.style('width',  `${maxW}px`);
 
-  classInput.position(padL, startY + 64);
-  passInput.position(padL, startY + 64 + inputH + gap);
-  loginBtn.position(padL,  startY + 64 + (inputH + gap)*2 + 16);
+  classInput.position(padL, startY + 60);
+  passInput.position(padL, startY + 60 + inputH + gap);
+  loginBtn.position(padL,  startY + 60 + (inputH + gap)*2 + 12);
 }
 
 function updateLoginVisibility(){
@@ -279,7 +279,7 @@ const rightCX = width * 0.75;
 const cardW   = Math.min(width / 2 * 0.70, 460);   // lidt større kort
 const cardH   = cardW * 0.70;
 const cardX   = rightCX - cardW / 2;
-const cardY   = height * 0.23;
+const cardY   = height * 0.30;
 
 // Hvid baggrund (kort) til logo
 push();
