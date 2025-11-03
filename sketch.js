@@ -113,7 +113,7 @@ function positionLoginUI(){
   // Venstre kolonne layout
   const leftW   = windowWidth/2;
   const padL    = Math.min(32, leftW*0.06); // venstre margin
-  const maxW    = Math.min(leftW - padL*2, 520);
+  const maxW    = Math.min(leftW - padL*2, 420);
   const startY  = windowHeight*0.22;        // top til overskriftens bund
   const gap     = 18;
   const inputH  = 52;
@@ -279,7 +279,7 @@ const rightCX = width * 0.75;
 const cardW   = Math.min(width / 2 * 0.70, 460);   // lidt større kort
 const cardH   = cardW * 0.70;
 const cardX   = rightCX - cardW / 2;
-const cardY   = height * 0.12;
+const cardY   = height * 0.30;
 
 // Hvid baggrund (kort) til logo
 push();
