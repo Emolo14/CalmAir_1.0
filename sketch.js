@@ -279,7 +279,7 @@ const rightCX = width * 0.75;
 const cardW   = Math.min(width / 2 * 0.70, 460);   // lidt større kort
 const cardH   = cardW * 0.70;
 const cardX   = rightCX - cardW / 2;
-const cardY   = height * 0.30;
+const cardY   = height * 0.23;
 
 // Hvid baggrund (kort) til logo
 push();
