@@ -8,9 +8,18 @@ let alarmTone = null;
 let loggedIn = false;
 let classInput, passInput, loginBtn;
 
+/* Logo */
+let logoImg;  // CalmAir.png
+
 /* Grænser */
 const DB_MIN = 30, DB_MAX = 100, DB_RED = 90;
 const CO2_YELLOW = 800, CO2_RED = 1200;
+
+/* ========== Preload (logo) ========== */
+function preload(){
+  // Sørg for at CalmAir.png ligger i samme mappe som index.html
+  logoImg = loadImage('CalmAir.png', ()=>{}, ()=>{ logoImg = null; });
+}
 
 /* ========== Setup ========== */
 function setup() {
@@ -18,10 +27,12 @@ function setup() {
   cnv.style('z-index','0');
   cnv.style('position','fixed');
   cnv.style('top','0'); cnv.style('left','0');
+
   angleMode(DEGREES);
   textFont("League Spartan");
   textStyle(BOLD);
   textAlign(CENTER, CENTER);
+
   mic = new p5.AudioIn();
   co2Start = millis();
 
@@ -60,12 +71,12 @@ function createLoginUI(){
   passInput.attribute('autocapitalize','off');
   baseInputStyle(passInput);
 
-  // Log ind-knap (venstre-justeret)
+  // Log ind-knap (mindre end før)
   loginBtn = createButton('Log ind');
   loginBtn.style('font-family','"League Spartan",system-ui');
   loginBtn.style('font-weight','700');
-  loginBtn.style('font-size','22px');
-  loginBtn.style('padding','12px 18px');
+  loginBtn.style('font-size','18px');     // ↓ mindre
+  loginBtn.style('padding','10px 16px');  // ↓ mindre
   loginBtn.style('border','0');
   loginBtn.style('border-radius','12px');
   loginBtn.style('background','#000');
@@ -101,7 +112,7 @@ function positionLoginUI(){
 
   // Venstre kolonne layout
   const leftW   = windowWidth/2;
-  const padL    = Math.min(32, leftW*0.06); // venstremargin
+  const padL    = Math.min(32, leftW*0.06); // venstre margin
   const maxW    = Math.min(leftW - padL*2, 520);
   const startY  = windowHeight*0.22;        // top til overskriftens bund
   const gap     = 18;
@@ -110,9 +121,9 @@ function positionLoginUI(){
   classInput.style('width', `${maxW}px`);
   passInput.style('width',  `${maxW}px`);
 
-  classInput.position(padL, startY + 64);                 // under overskrift
-  passInput.position(padL, startY + 64 + inputH + gap);   // under 1. felt
-  loginBtn.position(padL,  startY + 64 + (inputH + gap)*2 + 16); // under 2. felt
+  classInput.position(padL, startY + 64);
+  passInput.position(padL, startY + 64 + inputH + gap);
+  loginBtn.position(padL,  startY + 64 + (inputH + gap)*2 + 16);
 }
 
 function updateLoginVisibility(){
@@ -124,7 +135,6 @@ function updateLoginVisibility(){
 }
 
 function updateCanvasPointer(){
-  // mens login er på, må canvas IKKE fange tryk
   const cnv = document.querySelector('canvas');
   if (!cnv) return;
   cnv.style.pointerEvents = loggedIn ? 'auto' : 'none';
@@ -250,24 +260,45 @@ function draw(){
       return;
     }
 
-    // center-skel
+    // Sort midterstreg
     stroke(0); strokeCap(ROUND); strokeWeight(20);
     line(width/2, 0, width/2, height);
     noStroke();
 
-    // Venstre: overskrift + undertekst (venstre justeret)
+    // Venstre: overskrift venstre-justeret
     push();
     textAlign(LEFT, TOP);
     fill(0);
     const padL = Math.min(32, (width/2)*0.06);
-    textSize(min(width,height)*0.065);
-    text("Log ind for at fortsætte", padL, height*0.10);
+    textSize(min(width,height)*0.070);
+    text("Log ind for at fortsætte", padL, height*0.08);
     pop();
 
-    // Højre: CalmAir stort
-    drawCleanText("CalmAir", width*0.75, height*0.35, min(width,height)*0.12, 0);
+  // Højre: hvidt kort + CalmAir-logo (ingen CalmAir-tekst)
+const rightCX = width * 0.75;
+const cardW   = Math.min(width / 2 * 0.70, 460);   // lidt større kort
+const cardH   = cardW * 0.70;
+const cardX   = rightCX - cardW / 2;
+const cardY   = height * 0.12;
 
-    // DOM felter vises via updateLoginVisibility()
+// Hvid baggrund (kort) til logo
+push();
+noStroke();
+fill(255);
+rect(cardX, cardY, cardW, cardH, 28);  // rundere hjørner
+pop();
+
+// Selve logoet inde i kortet (med margin)
+if (logoImg) {
+  const margin = Math.min(cardW, cardH) * 0.12;     // indre luft
+  const imgW   = cardW - margin * 2;
+  const imgH   = cardH - margin * 2;
+  image(logoImg, cardX + margin, cardY + margin, imgW, imgH);
+}
+
+// (ingen CalmAir-tekst under logoet)
+
+
     return;
   }
 
@@ -276,6 +307,8 @@ function draw(){
     drawCleanText("Vend telefonen til landscape", width/2, height/2, min(width,height)*0.06, 0);
     return;
   }
+
+  // ====== (ALT DET ANDRE ER UÆNDRET) ======
 
   // Lyd
   if (aktiv) volRaw = mic.getLevel();
@@ -341,7 +374,6 @@ function draw(){
 /* ========== Input ========== */
 function mousePressed(){
   if (loggedIn) getAudioContext().resume();
-
   if (!loggedIn) return; // lad DOM-felter tage taps
 
   // Mute-knap
@@ -361,5 +393,4 @@ function mousePressed(){
   }
 }
 
-// Kun når vi er inde i appen blokerer vi default touch
 function touchStarted(){ if (loggedIn){ mousePressed(); return false; } }
