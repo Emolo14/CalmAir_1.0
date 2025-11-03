@@ -17,7 +17,6 @@ const CO2_YELLOW = 800, CO2_RED = 1200;
 
 /* ========== Preload (logo) ========== */
 function preload(){
-  // Sørg for at CalmAir.png ligger i samme mappe som index.html
   logoImg = loadImage('CalmAir.png', ()=>{}, ()=>{ logoImg = null; });
 }
 
@@ -48,7 +47,7 @@ function windowResized(){
   updateLoginVisibility();
 }
 
-/* Kun blokér scroll/gestures når vi er inde i appen */
+/* Undgå scroll kun inde i appen */
 function touchMoved(){ if (loggedIn) return false; }
 
 /* ========== LOGIN UI ========== */
@@ -71,12 +70,12 @@ function createLoginUI(){
   passInput.attribute('autocapitalize','off');
   baseInputStyle(passInput);
 
-  // Log ind-knap (mindre end før)
+  // Log ind-knap (mindre)
   loginBtn = createButton('Log ind');
   loginBtn.style('font-family','"League Spartan",system-ui');
   loginBtn.style('font-weight','700');
-  loginBtn.style('font-size','18px');     // ↓ mindre
-  loginBtn.style('padding','10px 16px');  // ↓ mindre
+  loginBtn.style('font-size','18px');
+  loginBtn.style('padding','10px 16px');
   loginBtn.style('border','0');
   loginBtn.style('border-radius','12px');
   loginBtn.style('background','#000');
@@ -91,16 +90,24 @@ function createLoginUI(){
   passInput.elt.addEventListener('keydown',  e=>{ if (e.key==='Enter'){ e.preventDefault(); handleLogin(); } });
 }
 
+// Fælles input-stil – justeret så højder virker (også Android/iOS)
 function baseInputStyle(inp){
   inp.style('font-family','"League Spartan",system-ui');
   inp.style('font-weight','700');
-  inp.style('font-size','22px');
-  inp.style('padding','12px 14px');
+  inp.style('font-size','18px');
+  inp.style('padding','10px 12px');
+
+  // vigtigt for at respektere height/padding
+  inp.style('box-sizing','border-box');
+  inp.style('-webkit-appearance','none');
+  inp.style('appearance','none');
+
   inp.style('border','0');
   inp.style('border-radius','12px');
   inp.style('outline','none');
   inp.style('box-shadow','0 8px 18px rgba(0,0,0,.15)');
   inp.style('background','#fff');
+
   inp.style('position','fixed');
   inp.style('z-index','10001');
   inp.style('-webkit-user-select','auto');
@@ -111,19 +118,21 @@ function positionLoginUI(){
   if (!classInput || !passInput || !loginBtn) return;
 
   // Venstre kolonne layout
-  const leftW   = windowWidth/2;
-  const padL    = Math.min(32, leftW*0.06); // venstre margin
-  const maxW    = Math.min(leftW - padL*2, 380);
-  const startY  = windowHeight*0.22;        // top til overskriftens bund
+  const leftW   = windowWidth / 2;
+  const padL    = Math.min(32, leftW * 0.06);
+  const maxW    = Math.min(leftW - padL * 2, 420); // smal
+  const startY  = windowHeight * 0.22;
   const gap     = 14;
-  const inputH  = 46;
+  const inputH  = 44; // lavere højde
 
-  classInput.style('width', `${maxW}px`);
-  passInput.style('width',  `${maxW}px`);
+  classInput.style('width',  `${maxW}px`);
+  passInput.style('width',   `${maxW}px`);
+  classInput.style('height', `${inputH}px`);
+  passInput.style('height',  `${inputH}px`);
 
   classInput.position(padL, startY + 60);
   passInput.position(padL, startY + 60 + inputH + gap);
-  loginBtn.position(padL,  startY + 60 + (inputH + gap)*2 + 12);
+  loginBtn.position(padL,   startY + 60 + (inputH + gap) * 2 + 12);
 }
 
 function updateLoginVisibility(){
@@ -274,30 +283,23 @@ function draw(){
     text("Log ind for at fortsætte", padL, height*0.08);
     pop();
 
-  // Højre: hvidt kort + CalmAir-logo (ingen CalmAir-tekst)
-const rightCX = width * 0.75;
-const cardW   = Math.min(width / 2 * 0.70, 460);   // lidt større kort
-const cardH   = cardW * 0.70;
-const cardX   = rightCX - cardW / 2;
-const cardY   = height * 0.30;
+    // Højre: hvidt kort + CalmAir-logo (ingen CalmAir-tekst)
+    const rightCX = width * 0.75;
+    const cardW   = Math.min(width / 2 * 0.70, 460);
+    const cardH   = cardW * 0.70;
+    const cardX   = rightCX - cardW / 2;
+    const cardY   = height * 0.18;  // rykket lidt ned
 
-// Hvid baggrund (kort) til logo
-push();
-noStroke();
-fill(255);
-rect(cardX, cardY, cardW, cardH, 28);  // rundere hjørner
-pop();
+    // Hvid baggrund (kort)
+    push(); noStroke(); fill(255); rect(cardX, cardY, cardW, cardH, 28); pop();
 
-// Selve logoet inde i kortet (med margin)
-if (logoImg) {
-  const margin = Math.min(cardW, cardH) * 0.12;     // indre luft
-  const imgW   = cardW - margin * 2;
-  const imgH   = cardH - margin * 2;
-  image(logoImg, cardX + margin, cardY + margin, imgW, imgH);
-}
-
-// (ingen CalmAir-tekst under logoet)
-
+    // Logo
+    if (logoImg){
+      const margin = Math.min(cardW, cardH) * 0.12;
+      const imgW   = cardW - margin * 2;
+      const imgH   = cardH - margin * 2;
+      image(logoImg, cardX + margin, cardY + margin, imgW, imgH);
+    }
 
     return;
   }
@@ -308,15 +310,13 @@ if (logoImg) {
     return;
   }
 
-  // ====== (ALT DET ANDRE ER UÆNDRET) ======
-
   // Lyd
   if (aktiv) volRaw = mic.getLevel();
   volFilt = lerp(volFilt, volRaw, 0.10);
   let dB_target = map(constrain(volFilt, 0, 0.15), 0, 0.15, DB_MIN, DB_MAX);
   dB = constrain(lerp(dB, dB_target, 0.20), DB_MIN, DB_MAX);
 
-  // CO2 cyklus 600→1200→800
+  // CO₂ cyklus 600→1200 (3m) → 800 (2m)
   const T_UP=180, T_DOWN=120, T_TOTAL=T_UP+T_DOWN;
   let t=(millis()-co2Start)/1000, phase=t%T_TOTAL;
   function easeInOut(u){ return u*u*(3-2*u); }
